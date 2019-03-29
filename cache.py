@@ -17,13 +17,8 @@ class Cache:
         self.cache = {} # develops into a full 16 * 16 structure
 
 
-    def prettify(self, val):
-        # method for return hex value from string input
-        # that is found within main memory list
-        # val == string data type
-        return hex(self.main_memory[int(val, 16)])[2:]
-
     def display_cache(self):
+        print(self.cache)
         # print out the actual cache structure
         print("SLOT    VALID  TAG    DATA")
         for slot, data in self.cache.items():
@@ -31,7 +26,7 @@ class Cache:
                 "{}     {}      {}      {}".format(
                 slot,
                 data.get(VALID), data.get(TAG),
-                ' '.join(map(str, data.get(DATA)))
+                ' '.join(map(hex, data.get(DATA)))
                 )
             )
         return self.cache
@@ -45,7 +40,6 @@ class Cache:
                 tag=0x0,
                 data=[0 for j in range(0x0, 0x10)],
             )
-
         return self.cache
 
     
@@ -64,17 +58,26 @@ class Cache:
     
     def get_cache_targets(self, address):
         # should return dictionary with values that will update the cache
-        block_offset = address & 0x0000000C # zero out all but the last 4 bits
-        first_address = address & 0xCCCCCCC0 # get block's first address
-        tag = address >> 8 # 
-        slot = (address & 0x000000C0) >> 4
+        block_offset = address & 0x00F # zero out all but the last 4 bits
+        first_address = address & 0xFF0 # get block's first address
+        slot = (address & 0x0F0) >> 4
+        tag = address >> 8
 
-        return {
+        # print("First address in main mem? {}".format(hex(self.main_memory[first_address])))
+        # print("Last address to have in cache data list: {}".format(
+        #     hex(self.main_memory[first_address+0xF])
+        # ))
+        targets = {
             'block_offset': block_offset,
-            'first_address': first_address,
+            'first_address': self.main_memory[first_address],
+            'last_address': self.main_memory[first_address+0xF],
             'tag': tag,
             'slot': slot,
         }
+
+        for key, val in targets.items():
+            print('KEY: {}, VALUE: {}'.format(key, hex(val)))
+        return targets
 
 
     # bringing in data output from get_cache_targets method
@@ -86,16 +89,19 @@ class Cache:
         slot = cache_targets.get('slot') # from intended targets
         tag = cache_targets.get('tag')
         first_addr = cache_targets.get('first_address')
+        last_addr = cache_targets.get('last_address')
         b_off = cache_targets.get('block_offset')
 
-        cache = self.cache.get(slot, None)
-        
+        print('TAG COMING FROM CACHE TARGETS', tag)
+        cache = self.cache.get(hex(slot), None) # check for slot num in the cache
+        print('GET SLOT IN CACHE', cache)
         if cache:
             # what is the current state in this part of the cache?
-            initial_valid = self.cache[cache][VALID]
-            intiial_tag = self.cache[cache][TAG]
-            initial_data = self.cache[cache][DATA]
+            initial_valid = cache.get(VALID)
+            intiial_tag = cache.get(TAG)
+            initial_data = cache.get(DATA)
 
+            print(initial_valid, intiial_tag, initial_data)
             # if valid flag is ON
             if initial_valid == self.valid_flags[1]:
                 # if tag is a MATCH
@@ -103,13 +109,13 @@ class Cache:
                     return True
                 else:
                 # if tag is NOT a match, then overwrite all values
-                    self.cache[cache][VALID] = self.valid_flags[1]
-                    self.cache[cache][TAG] = tag
+                    self.cache[hex(slot)][VALID] = self.valid_flags[1]
+                    self.cache[hex(slot)][TAG] = tag
                     # and overwrite data list
-                    self.cache[cache][DATA] = [
+                    self.cache[hex(slot)][DATA] = [
                         i for i in range(
                             first_addr,
-                            first_addr+0xF
+                            last_addr+0x1
                         )
                     ]
                     return False
@@ -117,12 +123,12 @@ class Cache:
             # if valid flag is OFF
             else:
                 # overwrite data
-                self.cache[cache][TAG] = tag
-                self.cache[cache][VALID] = self.valid_flags[1]
-                self.cache[cache][DATA] = [
+                self.cache[hex(slot)][TAG] = tag
+                self.cache[hex(slot)][VALID] = self.valid_flags[1]
+                self.cache[hex(slot)][DATA] = [
                     i for i in range(
                         first_addr,
-                        first_addr+0xF
+                        last_addr+0x1
                     )
                 ]
                 return False
@@ -135,24 +141,24 @@ class Cache:
 
     def write_byte(self):
 
-        address = int(input("What address would you like to write to? "))
+        address = int(input("What address would you like to write to? "), 16)
 
         if all([
-            address.isalnum(),
+            str(address).isalnum(),
             address <= self.MEMORY_MAX,
             address >= 0
         ]):
             data_to_write = int(input("What data would you like to write at that address? "), 16)
 
             if all([
-                data_to_write.isalnum(),
+                str(data_to_write).isalnum(),
                 data_to_write <= self.VALUE_MAX,
                 data_to_write >= 0,
             ]):
                 # officially write into main memory with user's data
                 self.main_memory[address] = data_to_write
-                print(self.main_memory[address])
-                if self.is_hit(self.get_cache_targets(self.main_memory[address])):
+
+                if self.is_hit(self.get_cache_targets(address)):
                     print("Value {} has been written to address {}. (CACHE HIT)".format(
                         data_to_write, address
                     ))
@@ -161,15 +167,19 @@ class Cache:
                         data_to_write, address
                     ))
 
+        # display cache
+        self.display_cache()
 
     def read_byte(self):
-        address = int(input("What address would you like to read? "))
+        address = int(input("What address would you like to read? "), 16)
 
         if self.is_hit(self.get_cache_targets(address)):
             print("At that byte there is the value {} (CACHE HIT)".format(
-                self.prettify(address)
+                address
             ))
         else:
             print("At that byte there is the value {} (CACHE MISS)".format(
-                self.prettify(address)
+                address
             ))
+
+        return self.display_cache()

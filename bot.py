@@ -6,17 +6,6 @@ def initialize():
     print("Here are your ACTUAL options: ")
 
 
-def write_byte():
-
-    pass
-
-
-def read_byte():
-    address = input("What address would you like to read?")
-
-    pass
-
-
 def switch(user_input, cache):
 
     options = dict(
@@ -32,11 +21,10 @@ def input_threshold(user_input, cache):
     options = ["r", "w", "d"]
     # handling case of actual alphabet letters
     # entered in as user input
-
+    user_input = user_input.lower()
     # if not an actual letter, then ask again
     if user_input.isalpha():
-        if user_input.lower() in options:
-            print("You entered: " + user_input)
+        if user_input in options:
             return switch(user_input, cache)
         else:
             print("Please enter an appropriate response...")
